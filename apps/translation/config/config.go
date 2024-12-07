@@ -7,12 +7,13 @@ import (
 )
 
 type Config struct {
-	Addr          string       `yaml:"port"`
-	RunMode       string       `yaml:"run_mode"`
-	JwtKey        string       `yaml:"jwt_key"`
-	TaskResultDir string       `yaml:"task_result_dir"`
-	RedisConfig   *redisConfig `yaml:"redis_config"`
-	MysqlConfig   *mysqlConfig `yaml:"mysql_config"`
+	Addr          string           `yaml:"port"`
+	RunMode       string           `yaml:"run_mode"`
+	JwtKey        string           `yaml:"jwt_key"`
+	TaskResultDir string           `yaml:"task_result_dir"`
+	RedisConfig   *redisConfig     `yaml:"redis_config"`
+	MysqlConfig   *mysqlConfig     `yaml:"mysql_config"`
+	RateLimit     *rateLimitConfig `yaml:"rate_limit"`
 }
 
 type redisConfig struct {
@@ -29,6 +30,10 @@ type mysqlConfig struct {
 	User     string `yaml:"user"`
 	Password string `yaml:"password"`
 	Db       string `yaml:"db"`
+}
+
+type rateLimitConfig struct {
+	Limit int `yaml:"limit"`
 }
 
 var c *Config

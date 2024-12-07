@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/jovian1994/cxh-1207-be-interview/apps/translation/config"
+	"github.com/jovian1994/cxh-1207-be-interview/apps/translation/initializer"
 	"github.com/jovian1994/cxh-1207-be-interview/pkg/logger"
 	"gopkg.in/yaml.v3"
 	"io/ioutil"
@@ -51,7 +52,7 @@ func main() {
 	}
 	gin.SetMode(ginRunMode)
 	engine := gin.Default()
-	//initializer.ServerInitializer(engine)
+	initializer.ServerInit(engine)
 	//创建HTTP服务器
 	server := &http.Server{
 		Addr:    config.GetConfig().Addr,
