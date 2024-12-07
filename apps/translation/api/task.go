@@ -29,6 +29,7 @@ func NewTaskApi(taskService service.ITaskService, receiverChannel chan map[strin
 		receiverTaskChangeChan: receiverChannel,
 	}
 	t.pushMessage()
+	return t
 }
 
 type taskApi struct {
