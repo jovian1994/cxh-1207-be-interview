@@ -153,3 +153,15 @@ func UserAlreadyExist(msg string) *APIError {
 		Message:   msg,
 	}
 }
+
+// UseNotExist 用户已存在
+func UseNotExist(msg string) *APIError {
+	if msg == "" {
+		msg = "user already exist"
+	}
+	return &APIError{
+		Code:      http.StatusBadRequest,
+		ErrorCode: userNotExistCode,
+		Message:   msg,
+	}
+}

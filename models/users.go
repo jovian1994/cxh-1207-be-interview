@@ -6,7 +6,7 @@ type UserModel struct {
 	gorm.Model
 	Username string `gorm:"column:username"`
 	Password string `gorm:"column:password"`
-	Role     string `gorm:"column:role"`
+	Role     int    `gorm:"column:role"`
 	Version  int    `gorm:"column:version"`
 }
 

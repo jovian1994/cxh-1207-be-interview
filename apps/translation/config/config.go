@@ -7,8 +7,12 @@ import (
 )
 
 type Config struct {
-	Addr    string `yaml:"port"`
-	RunMode string `yaml:"run_mode"`
+	Addr          string       `yaml:"port"`
+	RunMode       string       `yaml:"run_mode"`
+	JwtKey        string       `yaml:"jwt_key"`
+	TaskResultDir string       `yaml:"task_result_dir"`
+	RedisConfig   *redisConfig `yaml:"redis_config"`
+	MysqlConfig   *mysqlConfig `yaml:"mysql_config"`
 }
 
 type redisConfig struct {

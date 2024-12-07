@@ -17,4 +17,5 @@ const (
 
 const (
 	userAlreadyExistCode = 91000
+	userNotExistCode     = 91001
 )
