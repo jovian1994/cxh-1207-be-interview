@@ -46,6 +46,8 @@ func ServerInit(e *gin.Engine) {
 	e.NoRoute(middlewares.HandleNotFound)
 	e.NoMethod(middlewares.HandleNotFound)
 
+	notifyChannel := make(chan map[string]any, 10000)
+
 	tokenVerify := jwt.NewTokenVerify()
 	llmClient := llm.NewLLMClient()
 	userDao := dao.NewUserDao(dbClientName, tokenVerify)
@@ -55,7 +57,7 @@ func ServerInit(e *gin.Engine) {
 	taskService := service.NewTaskService(taskDao, llmClient)
 
 	userApi := api.NewUserApi(userService)
-	taskApi := api.NewTaskApi(taskService)
+	taskApi := api.NewTaskApi(taskService, notifyChannel)
 
 	rateLimit := getRateLimit()
 	r := e.Group("/v1")

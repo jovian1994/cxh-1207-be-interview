@@ -3,13 +3,14 @@ package api
 import (
 	"fmt"
 	"github.com/gin-gonic/gin"
+	"github.com/gorilla/websocket"
 	"github.com/jovian1994/cxh-1207-be-interview/apps/translation/request_mapping"
 	"github.com/jovian1994/cxh-1207-be-interview/apps/translation/service"
+	"github.com/jovian1994/cxh-1207-be-interview/pkg/strutil"
 	"github.com/jovian1994/cxh-1207-be-interview/pkg/unify_response"
 	"net/http"
 	"strconv"
 	"sync"
-	"time"
 )
 
 type ITaskApi interface {
@@ -17,16 +18,27 @@ type ITaskApi interface {
 	ExecTask(c *gin.Context) error
 	GetTaskDetail(c *gin.Context) error
 	DownloadTask(c *gin.Context) error
+	WatchTaskStatus(c *gin.Context) error
 }
 
-func NewTaskApi(taskService service.ITaskService) ITaskApi {
-	return &taskApi{taskService: taskService}
+func NewTaskApi(taskService service.ITaskService, receiverChannel chan map[string]any) ITaskApi {
+	return &taskApi{
+		taskService:            taskService,
+		connections:            make(map[string]*webSocketClient),
+		receiverTaskChangeChan: receiverChannel,
+	}
 }
 
 type taskApi struct {
 	taskService            service.ITaskService
-	receiverTaskChangeChan chan any
-	clientsMap             *sync.Map
+	receiverTaskChangeChan chan map[string]any
+	connections            map[string]*webSocketClient
+}
+
+type webSocketClient struct {
+	Conn     *websocket.Conn
+	Username string
+	ClientId string
 }
 
 func (t *taskApi) CreateTask(c *gin.Context) error {
@@ -95,21 +107,76 @@ func (t *taskApi) DownloadTask(c *gin.Context) error {
 	}
 }
 
+var upgrader = websocket.Upgrader{
+	CheckOrigin: func(r *http.Request) bool {
+		return true // 允许跨域
+	},
+}
+
+// 定义一个用于存储所有连接的map
+var connections = make(map[*websocket.Conn]bool)
+
+// 定义一个用于删除连接的函数
+var locker = &sync.Mutex{}
+
+func (t *taskApi) removeConnection(id string) {
+	locker.Lock()
+	defer locker.Unlock()
+	delete(t.connections, id)
+}
+
+func (t *taskApi) addConnection(id string, conn *webSocketClient) {
+	locker.Lock()
+	defer locker.Unlock()
+	t.connections[id] = conn
+}
+
+// 定义一个用于广播消息的函数
+func (t *taskApi) broadcastMessage(message string) {
+	for conn := range connections {
+		conn.WriteMessage(websocket.TextMessage, []byte(message))
+	}
+}
+
 func (t *taskApi) WatchTaskStatus(c *gin.Context) error {
-
-	// 将 HTTP 升级为 WebSocket
-
 	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return nil
 	}
-	for {
-		select {
-		case <-t.receiverTaskChangeChan:
-			return unify_response.NewOk()
-		case <-time.After(10 * time.Second):
-			return unify_response.NewOk()
-		}
+	defer conn.Close()
+	clientId := strutil.NewUUID()
+	username := c.GetString("username")
+	wsClient := &webSocketClient{
+		Conn:     conn,
+		Username: username,
+		ClientId: clientId,
 	}
+	t.addConnection(clientId, wsClient)
+	go func() {
+		for {
+			_, message, err := conn.ReadMessage()
+			if err != nil {
+				fmt.Println("read:", err)
+				t.removeConnection(wsClient.ClientId)
+				break
+			}
+			t.broadcastMessage(string(message))
+		}
+	}()
+	go func() {
+		for {
+			select {
+			case message := <-t.receiverTaskChangeChan:
+				// 向客户端发送消息
+				if err := conn.WriteMessage(
+					websocket.TextMessage, []byte(message.(string))); err != nil {
+					fmt.Println("write:", err)
+					t.removeConnection(wsClient.ClientId)
+					break
+				}
+			}
+		}
+	}()
+	return nil
 }
