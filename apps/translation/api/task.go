@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
@@ -22,11 +23,12 @@ type ITaskApi interface {
 }
 
 func NewTaskApi(taskService service.ITaskService, receiverChannel chan map[string]any) ITaskApi {
-	return &taskApi{
+	t := &taskApi{
 		taskService:            taskService,
 		connections:            make(map[string]*webSocketClient),
 		receiverTaskChangeChan: receiverChannel,
 	}
+	t.pushMessage()
 }
 
 type taskApi struct {
@@ -132,9 +134,15 @@ func (t *taskApi) addConnection(id string, conn *webSocketClient) {
 }
 
 // 定义一个用于广播消息的函数
-func (t *taskApi) broadcastMessage(message string) {
-	for conn := range connections {
-		conn.WriteMessage(websocket.TextMessage, []byte(message))
+func (t *taskApi) broadcastMessage(message map[string]any) {
+	for _, wsConn := range t.connections {
+		username, ok := message["username"].(string)
+		if ok && username == wsConn.Username {
+			dataBytes, err := json.Marshal(message)
+			if err == nil {
+				wsConn.Conn.WriteMessage(websocket.TextMessage, dataBytes)
+			}
+		}
 	}
 }
 
@@ -153,28 +161,33 @@ func (t *taskApi) WatchTaskStatus(c *gin.Context) error {
 		ClientId: clientId,
 	}
 	t.addConnection(clientId, wsClient)
+	ch := make(chan struct{}, 1)
 	go func() {
 		for {
-			_, message, err := conn.ReadMessage()
+			_, _, err := conn.ReadMessage()
 			if err != nil {
 				fmt.Println("read:", err)
 				t.removeConnection(wsClient.ClientId)
+				ch <- struct{}{}
 				break
 			}
-			t.broadcastMessage(string(message))
+
 		}
 	}()
+	return nil
+}
+
+func (t *taskApi) pushMessage() error {
 	go func() {
+		defer func() {
+			if err := recover(); err != nil {
+				fmt.Println(err)
+			}
+		}()
 		for {
 			select {
 			case message := <-t.receiverTaskChangeChan:
-				// 向客户端发送消息
-				if err := conn.WriteMessage(
-					websocket.TextMessage, []byte(message.(string))); err != nil {
-					fmt.Println("write:", err)
-					t.removeConnection(wsClient.ClientId)
-					break
-				}
+				t.broadcastMessage(message)
 			}
 		}
 	}()
