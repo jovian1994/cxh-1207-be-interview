@@ -22,12 +22,18 @@ type ITaskService interface {
 }
 
 type taskService struct {
-	taskDao dao.ITaskDao
-	llm     llm.ILLMClient
+	taskDao       dao.ITaskDao
+	llm           llm.ILLMClient
+	notifyChannel chan map[string]any
 }
 
-func NewTaskService(taskDao dao.ITaskDao, client llm.ILLMClient) ITaskService {
-	return &taskService{taskDao: taskDao}
+func NewTaskService(
+	taskDao dao.ITaskDao, client llm.ILLMClient, notifyChannel chan map[string]any) ITaskService {
+	return &taskService{
+		taskDao:       taskDao,
+		llm:           client,
+		notifyChannel: notifyChannel,
+	}
 }
 
 func (t *taskService) GetTaskDetail(
@@ -118,7 +124,13 @@ func (t *taskService) execute(taskData *models.TaskModel) error {
 				"task_key": filePath,
 			})
 		if err != nil {
-
+			logger.Error(fmt.Sprintf("failed to update task status: %s", err.Error()))
+			return
+		}
+		t.notifyChannel <- map[string]any{
+			"task_id":   int64(taskData.ID),
+			"file_path": filePath,
+			"status":    2,
 		}
 	}(taskData, t.llm)
 	return nil
