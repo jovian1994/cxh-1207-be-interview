@@ -8,6 +8,8 @@ import (
 	"github.com/jovian1994/cxh-1207-be-interview/pkg/unify_response"
 	"net/http"
 	"strconv"
+	"sync"
+	"time"
 )
 
 type ITaskApi interface {
@@ -22,7 +24,9 @@ func NewTaskApi(taskService service.ITaskService) ITaskApi {
 }
 
 type taskApi struct {
-	taskService service.ITaskService
+	taskService            service.ITaskService
+	receiverTaskChangeChan chan any
+	clientsMap             *sync.Map
 }
 
 func (t *taskApi) CreateTask(c *gin.Context) error {
@@ -88,5 +92,24 @@ func (t *taskApi) DownloadTask(c *gin.Context) error {
 		return nil
 	} else {
 		return unify_response.ParameterError("任务未完成")
+	}
+}
+
+func (t *taskApi) WatchTaskStatus(c *gin.Context) error {
+
+	// 将 HTTP 升级为 WebSocket
+
+	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return nil
+	}
+	for {
+		select {
+		case <-t.receiverTaskChangeChan:
+			return unify_response.NewOk()
+		case <-time.After(10 * time.Second):
+			return unify_response.NewOk()
+		}
 	}
 }

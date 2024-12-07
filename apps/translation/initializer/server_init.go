@@ -9,6 +9,7 @@ import (
 	"github.com/jovian1994/cxh-1207-be-interview/apps/translation/dao"
 	"github.com/jovian1994/cxh-1207-be-interview/apps/translation/service"
 	"github.com/jovian1994/cxh-1207-be-interview/middlewares"
+	"github.com/jovian1994/cxh-1207-be-interview/pkg/jwt"
 	"github.com/jovian1994/cxh-1207-be-interview/pkg/llm"
 	"github.com/jovian1994/cxh-1207-be-interview/pkg/mysql_tool"
 	"github.com/jovian1994/cxh-1207-be-interview/pkg/unify_response"
@@ -44,8 +45,10 @@ func ServerInit(e *gin.Engine) {
 	e.Use(middlewares.LoggerRecord())
 	e.NoRoute(middlewares.HandleNotFound)
 	e.NoMethod(middlewares.HandleNotFound)
+
+	tokenVerify := jwt.NewTokenVerify()
 	llmClient := llm.NewLLMClient()
-	userDao := dao.NewUserDao(dbClientName)
+	userDao := dao.NewUserDao(dbClientName, tokenVerify)
 	taskDao := dao.NewTaskDao(dbClientName)
 
 	userService := service.NewUserService(userDao)
@@ -59,10 +62,10 @@ func ServerInit(e *gin.Engine) {
 	{
 		r.POST("/user/login", unify_response.UnifyResponseWrapper(userApi.Login))
 		r.POST("/user/register", unify_response.UnifyResponseWrapper(userApi.Register))
-		r.POST("/task/create", middlewares.RateLimitMiddleware(rateLimit), unify_response.UnifyResponseWrapper(taskApi.CreateTask))
-		r.POST("/task/execute", middlewares.RateLimitMiddleware(rateLimit), unify_response.UnifyResponseWrapper(taskApi.ExecTask))
-		r.GET("/task/detail", unify_response.UnifyResponseWrapper(taskApi.GetTaskDetail))
-		r.GET("/task/download", middlewares.RateLimitMiddleware(rateLimit), unify_response.UnifyResponseWrapper(taskApi.DownloadTask))
+		r.POST("/task/create", middlewares.RateLimitMiddleware(rateLimit), middlewares.LoginRequired(tokenVerify), unify_response.UnifyResponseWrapper(taskApi.CreateTask))
+		r.POST("/task/execute", middlewares.RateLimitMiddleware(rateLimit), middlewares.LoginRequired(tokenVerify), unify_response.UnifyResponseWrapper(taskApi.ExecTask))
+		r.GET("/task/detail", middlewares.RateLimitMiddleware(rateLimit), middlewares.LoginRequired(tokenVerify), unify_response.UnifyResponseWrapper(taskApi.GetTaskDetail))
+		r.GET("/task/download", middlewares.RateLimitMiddleware(rateLimit), middlewares.LoginRequired(tokenVerify), unify_response.UnifyResponseWrapper(taskApi.DownloadTask))
 	}
 }
 

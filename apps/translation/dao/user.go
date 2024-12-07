@@ -15,9 +15,11 @@ type IUserDao interface {
 	AuthUser(username, password string) (jwtString string, err error)
 }
 
-func NewUserDao(dbClientName string) IUserDao {
+func NewUserDao(dbClientName string, jwtVerify jwt.ITokenVerify) IUserDao {
 	return &userDao{
-		dbClientName: dbClientName}
+		dbClientName: dbClientName,
+		jwtVerify:    jwtVerify,
+	}
 }
 
 type userDao struct {
