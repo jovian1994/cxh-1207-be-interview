@@ -1,0 +1,3 @@
+# 启动方式的路径
+run_mode: "dev"     # debug or release
+config_source: "local" # local or nacos
